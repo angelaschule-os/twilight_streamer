@@ -10,16 +10,10 @@ from dotenv import load_dotenv  # Import load_dotenv from python-dotenv library
 import os
 import git_version
 
-# Load the environment variables from the .env file
-load_dotenv()
-
-# Get the RTMP URL from the environment variable
-rtmp_url = os.getenv("RTMP_URL")
-
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("twilight_recorder.log"), logging.StreamHandler()],
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler("/tmp/twilight_recorder.log"), logging.StreamHandler()],
 )
 
 
