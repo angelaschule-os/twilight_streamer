@@ -13,7 +13,7 @@ import git_version
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("/tmp/twilight_recorder.log"), logging.StreamHandler()],
+    handlers=[logging.FileHandler("/tmp/twilight_streamer.log"), logging.StreamHandler()],
 )
 
 

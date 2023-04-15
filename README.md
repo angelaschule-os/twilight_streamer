@@ -17,19 +17,19 @@ source my_venv/bin/activate
 pip install ephem pytz schedule
 ```
 
-Create a systemd service file named `twilight_recorder.service` in the
+Create a systemd service file named `twilight_streamer.service` in the
 `/etc/systemd/system` directory:
 
 ```ini
 [Unit]
-Description=Twilight Recorder Service
+Description=Twilight Streamer Service
 After=network.target
 
 [Service]
 Type=simple
 User=<your_user>
 WorkingDirectory=<path_to_your_script_directory>
-ExecStart=<path_to_your_venv>/bin/python3 <path_to_your_script>/twilight_recorder.py
+ExecStart=<path_to_your_venv>/bin/python3 <path_to_your_script>/twilight_streamer.py
 Restart=on-failure
 RestartSec=5s
 
@@ -45,19 +45,19 @@ Reload the systemd daemon and start the service:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl start twilight_recorder.service
+sudo systemctl start twilight_streamer.service
 ```
 
 Enable the service to run at startup:
 
 ```bash
-sudo systemctl enable twilight_recorder.service
+sudo systemctl enable twilight_streamer.service
 ```
 
 Check the status of the service:
 
 ```bash
-sudo systemctl status twilight_recorder.service
+sudo systemctl status twilight_streamer.service
 ```
 
 Now your Python script will run as a systemd service, which will help ensure
