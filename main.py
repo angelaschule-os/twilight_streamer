@@ -34,28 +34,29 @@ def get_git_version_hash():
     except Exception as e:
         print("Error getting Git hash:", e)
         return None
-    
+
+
 def load_credentials(dotenv_path):
     load_dotenv(dotenv_path)
 
     rtmp_url = os.getenv("API_USERNAME")
 
-    return rtmp_url 
+    return rtmp_url
 
 
-def get_astronomical_twilight(observer):
+def get_twilight(observer):
     sun = ephem.Sun()
     observer.date = datetime.datetime.utcnow()
-    observer.horizon = "-18"  # Set horizon to -18 degrees for astronomical twilight
 
-    astronomical_twilight_evening = observer.next_setting(
-        sun, use_center=True
-    ).datetime()
-    astronomical_twilight_morning = observer.next_rising(
-        sun, use_center=True
-    ).datetime()
+    # Civil twilight uses the value –6 degrees.
+    # Nautical twilight uses the value –12 degrees.
+    # Astronomical twilight uses the value –18 degrees.
+    observer.horizon = "-12"  # Set horizon to -12 degrees for nautical twilight
 
-    return astronomical_twilight_evening, astronomical_twilight_morning
+    twilight_evening = observer.next_setting(sun, use_center=True).datetime()
+    twilight_morning = observer.next_rising(sun, use_center=True).datetime()
+
+    return twilight_evening, twilight_morning
 
 
 def convert_to_berlin_time(utc_time):
@@ -63,68 +64,62 @@ def convert_to_berlin_time(utc_time):
     return utc_time.replace(tzinfo=pytz.utc).astimezone(berlin_tz)
 
 
-def start_ffmpeg_recording():
+def start_ffmpeg_recording(rtmp_url):
     command = f"ffmpeg -re -stream_loop -1 -framerate 9 -f image2 -i /home/astroberry/allsky/tmp/image.jpg -vf scale=1280:720 -vcodec libx264 -preset medium -f flv {rtmp_url}"
     process = subprocess.Popen(command, shell=True)
+    logging.info("Started streaming")
     return process
 
 
 def stop_ffmpeg_recording(process):
     process.terminate()
+    logging.info("Stopped streaming")
 
 
-def schedule_recording():
-    duration = (
-        astronomical_twilight_morning - astronomical_twilight_evening
-    ).total_seconds()
+def schedule_recording(twilight_evening, twilight_morning, rtmp_url):
+    duration = (twilight_morning - twilight_evening).total_seconds()
+    logging.info("Streaming for %s seconds", duration)
 
-    process = start_ffmpeg_recording()
+    process = start_ffmpeg_recording(rtmp_url)
     time.sleep(duration)
     stop_ffmpeg_recording(process)
 
 
-if __name__ == "__main__":
+def update_twilight_and_schedule(observer, rtmp_url):
+    (
+        twilight_evening_utc,
+        twilight_morning_utc,
+    ) = get_twilight(observer)
+
+    twilight_evening = convert_to_berlin_time(twilight_evening_utc)
+    twilight_morning = convert_to_berlin_time(twilight_morning_utc)
+
+    logging.info(
+        "Twilight starts in the evening at (Berlin Time): %s",
+        twilight_evening,
+    )
+    logging.info(
+        "Twilight ends in the morning at (Berlin Time): %s",
+        twilight_morning,
+    )
+
+    schedule.every().day.at(twilight_evening.strftime("%H:%M:%S")).do(
+        lambda: schedule_recording(twilight_evening, twilight_morning, rtmp_url)
+    )
+
+
+def main():
     logging.info("Starting twilight recorder script")
-
-    if not git_version.GIT_HASH:
-        git_version.GIT_HASH = get_git_version_hash()
-
-    parser = argparse.ArgumentParser(description="Twitching Allsky Twilight Streamer")
-    parser.add_argument(
-        "-v", "--version", action="version", version=f"Git version hash: {git_version.GIT_HASH}"
-    )
-    parser.add_argument(
-        "-c","--config", metavar="PATH", default=".env",
-        help="Path to the config file (default: .env)"
-    )
-    args = parser.parse_args()
-
+    rtmp_url = load_credentials(args.config)
     observer = ephem.Observer()
     observer.lat, observer.lon, observer.elevation = "52.2799", "8.0472", 62.0
 
-    (
-        astronomical_twilight_evening_utc,
-        astronomical_twilight_morning_utc,
-    ) = get_astronomical_twilight(observer)
+    update_twilight_and_schedule(observer, rtmp_url)
 
-    astronomical_twilight_evening = convert_to_berlin_time(
-        astronomical_twilight_evening_utc
-    )
-    astronomical_twilight_morning = convert_to_berlin_time(
-        astronomical_twilight_morning_utc
-    )
-
-    logging.info(
-        "Astronomical twilight starts in the evening at (Berlin Time): %s",
-        astronomical_twilight_evening,
-    )
-    logging.info(
-        "Astronomical twilight ends in the morning at (Berlin Time): %s",
-        astronomical_twilight_morning,
-    )
-
-    schedule.every().day.at(astronomical_twilight_evening.strftime("%H:%M:%S")).do(
-        schedule_recording
+    #  Function to run every day at a specific time when you expect the twilight
+    #  time to have changed, such as 14:00h in the Berlin timezone. 
+    schedule.every().day.at("14:00:00").do(
+        lambda: update_twilight_and_schedule(observer, rtmp_url)
     )
 
     try:
@@ -133,3 +128,26 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         logging.info("Stopping twilight recorder script")
+
+
+if __name__ == "__main__":
+    if not git_version.GIT_HASH:
+        git_version.GIT_HASH = get_git_version_hash()
+
+    parser = argparse.ArgumentParser(description="Twitching Allsky Twilight Streamer")
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version=f"Git version hash: {git_version.GIT_HASH}",
+    )
+    parser.add_argument(
+        "-c",
+        "--config",
+        metavar="PATH",
+        default=".env",
+        help="Path to the config file (default: .env)",
+    )
+    args = parser.parse_args()
+
+    main()
