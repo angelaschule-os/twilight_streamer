@@ -1,5 +1,5 @@
 ephem==4.1.4
-python-dotenv==0.21.1: python_version < '3.9'
+python-dotenv==0.21.1; python_version < '3.9'
 python-dotenv==1.0.0; python_version >= '3.9'
 pytz==2023.3
 schedule==1.2.0
