@@ -33,7 +33,7 @@ def get_git_version_hash():
 def load_credentials(dotenv_path):
     load_dotenv(dotenv_path)
 
-    rtmp_url = os.getenv("API_USERNAME")
+    rtmp_url = os.getenv("RTMP_URL")
 
     return rtmp_url
 
@@ -62,6 +62,7 @@ def start_ffmpeg_recording(rtmp_url):
     command = f"ffmpeg -re -stream_loop -1 -framerate 9 -f image2 -i /home/astroberry/allsky/tmp/image.jpg -vf scale=1280:720 -vcodec libx264 -preset medium -f flv {rtmp_url}"
     process = subprocess.Popen(command, shell=True)
     logging.info("Started streaming")
+    logging.info(f"Process ID: {process.pid}")
     return process
 
 
