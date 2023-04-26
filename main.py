@@ -13,7 +13,10 @@ import git_version
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("/tmp/twilight_streamer.log"), logging.StreamHandler()],
+    handlers=[
+        logging.FileHandler("/tmp/twilight_streamer.log"),
+        logging.StreamHandler(),
+    ],
 )
 
 
@@ -40,7 +43,13 @@ def load_credentials(dotenv_path):
 
 def get_twilight(observer):
     sun = ephem.Sun()
-    observer.date = datetime.datetime.utcnow()
+
+    # Get the current date without time
+    current_date = datetime.datetime.utcnow()
+    logging.info("Current date: %s", current_date)
+
+    # Set the observer's date to the beginning of the current day
+    observer.date = current_date
 
     # Civil twilight uses the value –6 degrees.
     # Nautical twilight uses the value –12 degrees.
@@ -48,7 +57,9 @@ def get_twilight(observer):
     observer.horizon = "-12"  # Set horizon to -12 degrees for nautical twilight
 
     twilight_evening = observer.next_setting(sun, use_center=True).datetime()
+    logging.info("Evening: %s (UTC)", twilight_evening)
     twilight_morning = observer.next_rising(sun, use_center=True).datetime()
+    logging.info("Morning: %s (UTC)", twilight_morning)
 
     return twilight_evening, twilight_morning
 
@@ -59,9 +70,9 @@ def convert_to_berlin_time(utc_time):
 
 
 def start_ffmpeg_recording(rtmp_url):
+    logging.info("Started streaming")
     command = f"ffmpeg -re -stream_loop -1 -framerate 9 -f image2 -i /home/astroberry/allsky/tmp/image.jpg -vf scale=1280:720 -vcodec libx264 -preset medium -f flv {rtmp_url}"
     process = subprocess.Popen(command, shell=True)
-    logging.info("Started streaming")
     logging.info(f"Process ID: {process.pid}")
     return process
 
@@ -71,8 +82,7 @@ def stop_ffmpeg_recording(process):
     logging.info("Stopped streaming")
 
 
-def schedule_recording(twilight_evening, twilight_morning, rtmp_url):
-    duration = (twilight_morning - twilight_evening).total_seconds()
+def schedule_recording(duration, rtmp_url):
     logging.info("Streaming for %s seconds", duration)
 
     process = start_ffmpeg_recording(rtmp_url)
@@ -81,6 +91,7 @@ def schedule_recording(twilight_evening, twilight_morning, rtmp_url):
 
 
 def update_twilight_and_schedule(observer, rtmp_url):
+    logging.info("Update twilight and schedule.")
     (
         twilight_evening_utc,
         twilight_morning_utc,
@@ -88,6 +99,7 @@ def update_twilight_and_schedule(observer, rtmp_url):
 
     twilight_evening = convert_to_berlin_time(twilight_evening_utc)
     twilight_morning = convert_to_berlin_time(twilight_morning_utc)
+    duration = (twilight_morning - twilight_evening).total_seconds()
 
     logging.info(
         "Twilight starts in the evening at (Berlin Time): %s",
@@ -98,8 +110,10 @@ def update_twilight_and_schedule(observer, rtmp_url):
         twilight_morning,
     )
 
+    logging.info("Duration: %s seconds", duration)
+
     schedule.every().day.at(twilight_evening.strftime("%H:%M:%S")).do(
-        lambda: schedule_recording(twilight_evening, twilight_morning, rtmp_url)
+        lambda: schedule_recording(duration, rtmp_url)
     )
 
 
@@ -108,12 +122,11 @@ def main():
     rtmp_url = load_credentials(args.config)
     observer = ephem.Observer()
     observer.lat, observer.lon, observer.elevation = "52.2799", "8.0472", 62.0
-
-    update_twilight_and_schedule(observer, rtmp_url)
+    logging.info("Observer created: %s", observer.date)
 
     #  Function to run every day at a specific time when you expect the twilight
-    #  time to have changed, such as 14:00h in the Berlin timezone. 
-    schedule.every().day.at("14:00:00").do(
+    #  time to have changed, such as 14:00h in the Berlin timezone.
+    schedule.every().day.at("20:35:00").do(
         lambda: update_twilight_and_schedule(observer, rtmp_url)
     )
 
