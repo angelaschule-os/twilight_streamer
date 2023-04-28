@@ -71,8 +71,28 @@ def convert_to_berlin_time(utc_time):
 
 def start_ffmpeg_recording(rtmp_url):
     logging.info("Started streaming")
-    command = f"ffmpeg -re -stream_loop -1 -framerate 9 -f image2 -i /home/astroberry/allsky/tmp/image.jpg -vf scale=1280:720 -vcodec libx264 -preset medium -f flv {rtmp_url}"
-    process = subprocess.Popen(command, shell=True)
+    command = [
+        "ffmpeg",
+        "-re",
+        "-stream_loop",
+        "-1",
+        "-framerate",
+        "9",
+        "-f",
+        "image2",
+        "-i",
+        "/home/astroberry/allsky/tmp/image.jpg",
+        "-vf",
+        "scale=1280:720",
+        "-vcodec",
+        "libx264",
+        "-preset",
+        "medium",
+        "-f",
+        "flv",
+        rtmp_url,
+    ]
+    process = subprocess.Popen(command)
     logging.info(f"Process ID: {process.pid}")
     return process
 
@@ -126,7 +146,7 @@ def main():
 
     #  Function to run every day at a specific time when you expect the twilight
     #  time to have changed, such as 14:00h in the Berlin timezone.
-    schedule.every().day.at("20:35:00").do(
+    schedule.every().day.at("14:00:00").do(
         lambda: update_twilight_and_schedule(observer, rtmp_url)
     )
 
